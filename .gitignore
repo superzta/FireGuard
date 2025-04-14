@@ -1,0 +1,7 @@
+# Ignore all the compiled files
+*.hex
+*.elf
+*.o
+*.s
+*.d
+*.dep
