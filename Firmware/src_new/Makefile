@@ -1,7 +1,7 @@
 DEVICE     = atmega328p
 CLOCK      = 7372800
 PROGRAMMER = -c usbtiny -P usb
-OBJECTS    = FireGuard.o I2C_lib.o stepper_lib.o
+OBJECTS    = FireGuard.o I2C_lib.o stepper_lib.o servo_lib.o
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0xe0:m
 
 # Fuse Low Byte = 0xe0   Fuse High Byte = 0xd9   Fuse Extended Byte = 0xff
@@ -47,6 +47,9 @@ I2C_lib.o: I2C.c I2C.h
 
 stepper_lib.o: stepper.c stepper.h
 	$(COMPILE) -c stepper.c -o stepper_lib.o -D EXCLUDE_MAIN
+
+servo_lib.o: servo.c servo.h
+	$(COMPILE) -c servo.c -o servo_lib.o -D EXCLUDE_MAIN
 
 flash:	all
 	$(AVRDUDE) -U flash:w:main.hex:i

@@ -8,7 +8,6 @@
 
 #include "I2C.h"
 #include "stepper.h"
-#include "servo.h"
 
 #ifndef F_CPU
 #define F_CPU 7372800UL
@@ -57,9 +56,6 @@ int main(void) {
     
     // Start with counter-clockwise direction (default)
     set_stepper_direction(false);
-
-    // Initialize servo
-    servo_init();
     
     // Main variables
     uint16_t current_step = 0;
@@ -143,12 +139,6 @@ int main(void) {
             sprintf(buffer, "Alert! Current temp: %d.%02d°C at [%d][%d]", 
                     int_part, frac_part, max_row_pos, max_col_pos);
             serial_println(buffer);
-
-            // Set servo to 0 and 105 degrees
-            set_servo_degree(0);
-            _delay_ms(1000);
-            set_servo_degree(105);
-            _delay_ms(1000);
         }
         
         // Update at 1Hz in alert mode
