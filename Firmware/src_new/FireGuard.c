@@ -15,15 +15,17 @@
 
 #define BAUD_RATE 230400
 
+// Scanning motion parameters - easily changeable
+#define SCAN_RANGE_STEPS 800   // 120 degrees of motion (approximately)
+#define STEPS_PER_CHECK 20     // Check temperature every 20 steps
+#define MOTOR_STEP_DELAY 10    // Milliseconds between steps to control speed
+
 // Threshold temperature for fire detection (in centidegrees)
 #define FIRE_THRESHOLD 5000  // 50.00°C
 
 // Position constraints for fire confirmation (helps prevent false positives)
 #define FIRE_COL_MIN 0
 #define FIRE_COL_MAX 3
-
-// Steps between temperature checks
-#define STEPS_PER_CHECK 20
 
 int main(void) {
     // Disable watchdog
@@ -51,38 +53,57 @@ int main(void) {
     
     // Initialize stepper motor
     setup_pins();
-    set_stepper_direction(true);  // Set direction clockwise
+    
+    // Start with counter-clockwise direction (default)
+    set_stepper_direction(false);
     
     // Main variables
-    uint16_t steps = 0;
+    uint16_t current_step = 0;
+    bool scanning_forward = false;  // Start counter-clockwise
     bool fire_detected = false;
     
-    serial_println("Starting fire detection patrol...");
+    serial_println("Starting fire detection patrol with scanning motion...");
     
     // Main loop - patrol until fire detected
     while (!fire_detected) {
-        // Step the bottom motor once (using stepper functions exactly as in stepper.c)
+        // Step the motor once in current direction
         move_bottom_stepper_once();
-        _delay_ms(10);  // Short delay to slow down motor movement
+        _delay_ms(MOTOR_STEP_DELAY);
         
-        steps++;
+        current_step++;
+        
+        // Check if we need to reverse direction
+        if (current_step >= SCAN_RANGE_STEPS) {
+            // Change direction
+            scanning_forward = !scanning_forward;
+            set_stepper_direction(scanning_forward);
+            
+            // Reset step counter
+            current_step = 0;
+            
+            // Log direction change
+            if (scanning_forward) {
+                serial_println("Changing direction: Clockwise");
+            } else {
+                serial_println("Changing direction: Counter-clockwise");
+            }
+        }
         
         // Check temperature periodically
-        if (steps >= STEPS_PER_CHECK) {
-            steps = 0;
-            
+        if (current_step % STEPS_PER_CHECK == 0) {
             // Read thermal data from sensor
             result = mlx90640_read_center_region();
             
             // Process the reading if successful
             if (result == 0) {
                 // Print status update
-                char buffer[48];
+                char buffer[64];
                 int16_t int_part = max_temp / 100;
                 uint8_t frac_part = abs(max_temp) % 100;
                 
-                sprintf(buffer, "Max: %d.%02d°C at [%d][%d]", 
-                        int_part, frac_part, max_row_pos, max_col_pos);
+                sprintf(buffer, "Position: %d/%d | Max: %d.%02d°C at [%d][%d]", 
+                        current_step, SCAN_RANGE_STEPS, int_part, frac_part, 
+                        max_row_pos, max_col_pos);
                 serial_println(buffer);
                 
                 // Check if fire detected (temp > threshold and in target columns)
