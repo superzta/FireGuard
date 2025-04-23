@@ -398,8 +398,10 @@ int mlx90640_init() {
 
 // Read and process center region
 int mlx90640_read_center_region() {
-    // Reset max value
+    // Reset max value to a very low temperature to ensure any valid reading will be higher
     max_temp = -32768;
+    max_row_pos = 0;
+    max_col_pos = 0;
     int valid_readings = 0;
     int row_to_skip = -1; // Initialize to invalid row
     int max_row = 0;  // Track location of max temperature
@@ -443,6 +445,9 @@ int mlx90640_read_center_region() {
     sprintf(buffer, "%d", row_to_skip);
     serial_println(buffer);
     
+    // Reset max_temp AGAIN before second pass to ensure we only consider valid readings
+    max_temp = -32768;
+    
     // Second pass: copy data to center_data, skipping the extreme row
     for (uint8_t i = 0; i < CENTER_SIZE; i++) {
         // Skip the row with extreme temperatures
@@ -463,7 +468,8 @@ int mlx90640_read_center_region() {
             valid_readings++;
             
             // Update max temp (ensure we're looking for actual highest value)
-            if (validated_value > max_temp) {
+            // Only consider reasonably valid temperatures (not extreme outliers)
+            if (validated_value > max_temp && validated_value < 10000) { // 100°C as reasonable max
                 max_temp = validated_value;
                 max_row = dest_row;
                 max_col = j;

@@ -111,8 +111,23 @@ int main(void) {
                             current_step, SCAN_RANGE_STEPS, int_part, frac_part, 
                             max_row_pos, max_col_pos);
                     serial_println(buffer);
-                    
-                    
+
+                    // If max temp is greater than threshold set the btm stepper to move towards
+                    if (max_temp > FIRE_THRESHOLD) {
+                        // Move the stepper left or right so that the col pos is about 0-3
+                        if (max_col_pos < FIRE_COL_MIN) {
+
+                            move_bottom_stepper_once();
+                            serial_println("Moving left to point at fire");
+
+                        } else if (max_col_pos > FIRE_COL_MAX) {
+                            // Set direction to right
+                            set_stepper_direction(true);
+                            move_bottom_stepper_once();
+                            serial_println("Moving right to point at fire");
+                        }
+                    }
+
                     // Check if fire detected (temp > threshold and in target columns)
                     if (max_temp > FIRE_THRESHOLD && 
                         max_col_pos >= FIRE_COL_MIN && max_col_pos <= FIRE_COL_MAX) {
@@ -146,6 +161,11 @@ int main(void) {
                 sprintf(buffer, "Alert! Current temp: %d.%02d°C at [%d][%d]", 
                         int_part, frac_part, max_row_pos, max_col_pos);
                 serial_println(buffer);
+
+                // print out the whole arrat of temp values in a matrix form
+                // use the print_center_matrix function to print the array
+                print_center_matrix();
+
 
                 // Set servo to 0 and 105 degrees
                 set_servo_degree(0);
