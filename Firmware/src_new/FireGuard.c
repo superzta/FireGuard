@@ -25,7 +25,7 @@
 #define MOTOR_STEP_DELAY 10    // Milliseconds between steps to control speed
 
 // Threshold temperature for fire detection (in centidegrees)
-#define FIRE_THRESHOLD 3000  // 30.00°C
+#define FIRE_THRESHOLD 5000  // 50.00°C
 
 // Position constraints for fire confirmation (helps prevent false positives)
 #define FIRE_COL_MIN 13
@@ -34,6 +34,9 @@
 // Buzzer parameters for fire alert
 #define BUZZER_ON_TIME 3000   // 3 second buzz
 #define BUZZER_OFF_TIME 500   // 0.5 second silence
+
+// For reusing buffers
+char buffer[48];
 
 int main(void) {
     // Disable watchdog
@@ -52,7 +55,6 @@ int main(void) {
     
     int result = mlx90640_init();
     if (result != 0) {
-        char buffer[32];
         sprintf(buffer, "Thermal sensor init failed: %d", result);
         serial_println(buffer);
     } else {
@@ -61,16 +63,12 @@ int main(void) {
     
     // Initialize stepper motor
     setup_pins();
-
     
     // Start with counter-clockwise direction (default)
     set_stepper_direction(false);
 
     // Initialize servo
     servo_init();
-
-    // Make sure the servo is at 0 degrees
-    set_servo_degree(0);
     
     // Initialize ultrasonic sensor
     ultrasonic_init();
@@ -89,12 +87,6 @@ int main(void) {
     bool fire_detected = false;
     
     serial_println("Starting fire detection patrol with scanning motion...");
-
-    // Print the initial message
-    lcd_moveto(0, 0);
-    // clear the screen
-    lcd_writecommand(0x01);
-    lcd_stringout("Detection On");
     
     // Main loop
     while (1) {
@@ -131,24 +123,13 @@ int main(void) {
                 // Process the reading if successful
                 if (result == 0) {
                     // Print status update
-                    char buffer[64];
                     int16_t int_part = max_temp / 100;
                     uint8_t frac_part = abs(max_temp) % 100;
                     
-                    sprintf(buffer, "Position: %d/%d | Max: %d.%02d°C at [%d][%d]", 
+                    sprintf(buffer, "Pos: %d/%d | Max: %d.%02d°C at [%d][%d]", 
                             current_step, SCAN_RANGE_STEPS, int_part, frac_part, 
                             max_row_pos, max_col_pos);
                     serial_println(buffer);
-
-                    lcd_writecommand(0x01);
-                    lcd_moveto(0, 0);
-                    lcd_stringout("Detection On");
-                    lcd_moveto(1, 0);
-                    lcd_stringout("Step:");
-                    char lcd_buffer[10];
-                    lcd_stringout(itoa(current_step, lcd_buffer, 10));
-                    lcd_stringout(" / ");
-                    lcd_stringout(itoa(SCAN_RANGE_STEPS, lcd_buffer, 10));
 
                     // If max temp is greater than threshold set the btm stepper to move towards
                     if (max_temp > FIRE_THRESHOLD) {
@@ -177,17 +158,16 @@ int main(void) {
                         fire_detected = true;
                         
                         // Detailed fire detection message
-                        char alert_buffer[64];
-                        sprintf(alert_buffer, "FIRE DETECTED! Temp: %d.%02d°C at position [%d][%d]", 
+                        sprintf(buffer, "FIRE DETECTED! Temp: %d.%02d°C at [%d][%d]", 
                                 int_part, frac_part, max_row_pos, max_col_pos);
-                        serial_println(alert_buffer);
+                        serial_println(buffer);
                     }
                 } else {
                     serial_println("Error reading thermal data");
-                    // lcd_moveto(0, 0);
-                    // // clear the screen
-                    // lcd_writecommand(0x01);
-                    // lcd_stringout("Error reading thermal data");
+                    lcd_moveto(0, 0);
+                    // clear the screen
+                    lcd_writecommand(0x01);
+                    lcd_stringout("Error reading thermal data");
                 }
             }
         }
@@ -204,54 +184,35 @@ int main(void) {
             result = mlx90640_read_center_region();
             
             if (result == 0) {
-                char buffer[64];
                 int16_t int_part = max_temp / 100;
                 uint8_t frac_part = abs(max_temp) % 100;
                 
-                sprintf(buffer, "Alert! Current temp: %d.%02d°C at [%d][%d]", 
+                sprintf(buffer, "Alert! Temp: %d.%02d°C at [%d][%d]", 
                         int_part, frac_part, max_row_pos, max_col_pos);
                 serial_println(buffer);
 
                 // clear the screen
                 lcd_writecommand(0x01);
                 lcd_moveto(0, 0);
-                lcd_stringout("Temp: ");
-                // Correct conversion for int_part
-                char int_part_str[8];  // Enough space for int part
-                itoa(int_part, int_part_str, 10);  // base 10
-                lcd_stringout(int_part_str);
-
-                // Print "."
-                lcd_stringout(".");
-
-                // Correct conversion for frac_part
-                char frac_part_str[4];  // Up to two digits and null terminator
-                if (frac_part < 10) {
-                    // Leading zero for single-digit fraction
-                    lcd_stringout("0");
-                }
-                itoa(frac_part, frac_part_str, 10);
-                lcd_stringout(frac_part_str);
-
-                // Then "°C"
-                lcd_stringout(" C");
-
+                lcd_stringout("Alert! Temp: ");
+                lcd_stringout(buffer);
+                // print out the whole arrat of temp values in a matrix form
+                // use the print_center_matrix function to print the array
                 print_center_matrix();
 
                 // Measure distance with ultrasonic sensor
                 float distance = measure_distance();
                 
                 // Display distance
-                char dist_buffer[32];
-                dtostrf(distance, 6, 2, dist_buffer);
+                dtostrf(distance, 6, 2, buffer);
                 serial_print("Distance to fire: ");
-                serial_print(dist_buffer);
+                serial_print(buffer);
                 serial_println(" cm");
 
                 // Move to second line
                 lcd_moveto(1, 0);
-                lcd_stringout("Dist:");
-                lcd_stringout(dist_buffer);
+                lcd_stringout("Distance: ");
+                lcd_stringout(buffer);
                 lcd_stringout(" cm");
                 
                 // Play the warning sound

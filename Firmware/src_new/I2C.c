@@ -50,8 +50,8 @@ int16_t max_temp;
 uint8_t max_row_pos;  // Position of max temperature
 uint8_t max_col_pos;
 uint8_t i2c_initialized = 0;
-// Removed large frame buffer arrays (frame_buffer[834] & eeMLX90640[832])
-// Will read data in chunks instead of all at once
+// Shared buffer for string operations
+char string_buffer[8]; 
 
 // Serial communication functions
 void serial_init(unsigned short ubrr) {
@@ -413,10 +413,12 @@ int mlx90640_read_center_region() {
         return -1;
     }
     
-    // First pass: read all data and find the row with extreme temperature
-    int16_t temp_buffer[CENTER_SIZE][CENTER_SIZE];
-    
+    // Process one row at a time to save memory
     for (uint8_t i = 0; i < CENTER_SIZE; i++) {
+        int16_t row_buffer[CENTER_SIZE];
+        int row_has_extreme = 0;
+        
+        // Read a row of data
         for (uint8_t j = 0; j < CENTER_SIZE; j++) {
             // Calculate actual sensor position
             uint8_t row = i + CENTER_START_ROW;
@@ -426,12 +428,17 @@ int mlx90640_read_center_region() {
             int16_t value = read_pixel_value(row, col);
             
             // Store temporarily
-            temp_buffer[i][j] = value;
+            row_buffer[j] = value;
             
             // Check if this is an extreme value (like reference pixel)
             if (value > 14000) { // 140°C is extreme for this application
-                row_to_skip = i; // Mark this row to be skipped
+                row_has_extreme = 1;
             }
+        }
+        
+        // If this row has extreme values, mark it for skipping later
+        if (row_has_extreme) {
+            row_to_skip = i;
         }
     }
     
@@ -441,29 +448,28 @@ int mlx90640_read_center_region() {
     }
     
     serial_print("Removing row with extreme values: ");
-    char buffer[8];
-    sprintf(buffer, "%d", row_to_skip);
-    serial_println(buffer);
+    sprintf(string_buffer, "%d", row_to_skip);
+    serial_println(string_buffer);
     
     // Reset max_temp AGAIN before second pass to ensure we only consider valid readings
     max_temp = -32768;
     
-    // Second pass: copy data to center_data, skipping the extreme row
+    // Second pass: process row by row and fill center_data, skipping the extreme row
+    uint8_t dest_row = 0; // Keep track of destination row after skipping
+    
     for (uint8_t i = 0; i < CENTER_SIZE; i++) {
         // Skip the row with extreme temperatures
         if (i == row_to_skip) continue;
         
-        // Calculate destination row (shift rows after the skipped row up)
-        uint8_t dest_row = i;
-        if (i > row_to_skip) dest_row = i - 1;
-        
+        // For each row that we keep, process and store it
         for (uint8_t j = 0; j < CENTER_SIZE; j++) {
-            // Apply validation to the stored value
+            // Read and validate pixel value again
             uint8_t row = i + CENTER_START_ROW;
             uint8_t col = j + CENTER_START_COL;
-            int16_t validated_value = validate_temp(temp_buffer[i][j], row, col);
+            int16_t value = read_pixel_value(row, col);
+            int16_t validated_value = validate_temp(value, row, col);
             
-            // Store the validated value in the shifted position
+            // Store the validated value
             center_data[dest_row][j] = validated_value;
             valid_readings++;
             
@@ -475,6 +481,8 @@ int mlx90640_read_center_region() {
                 max_col = j;
             }
         }
+        
+        dest_row++; // Move to next destination row
     }
     
     // Store max location in global variables for printing
@@ -496,9 +504,8 @@ void print_center_matrix() {
     // Column headers
     serial_print("     ");
     for (uint8_t j = 0; j < CENTER_SIZE; j++) {
-        char buffer[8];
-        sprintf(buffer, "%2d  ", j);
-        serial_print(buffer);
+        sprintf(string_buffer, "%2d  ", j);
+        serial_print(string_buffer);
     }
     serial_println("");
     
@@ -511,9 +518,8 @@ void print_center_matrix() {
     
     // Print data with row numbers
     for (uint8_t i = 0; i < CENTER_SIZE - 1; i++) {  // One less row since we removed a row
-        char buffer[8];
-        sprintf(buffer, "%2d | ", i);
-        serial_print(buffer);
+        sprintf(string_buffer, "%2d | ", i);
+        serial_print(string_buffer);
         
         for (uint8_t j = 0; j < CENTER_SIZE; j++) {
             char value_buffer[8];
