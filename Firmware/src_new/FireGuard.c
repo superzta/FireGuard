@@ -9,6 +9,9 @@
 #include "I2C.h"
 #include "stepper.h"
 #include "servo.h"
+#include "ultrasonic.h"
+#include "buzzer.h"
+#include "lcd.h"
 
 #ifndef F_CPU
 #define F_CPU 7372800UL
@@ -22,11 +25,15 @@
 #define MOTOR_STEP_DELAY 10    // Milliseconds between steps to control speed
 
 // Threshold temperature for fire detection (in centidegrees)
-#define FIRE_THRESHOLD 5000  // 50.00°C
+#define FIRE_THRESHOLD 3000  // 30.00°C
 
 // Position constraints for fire confirmation (helps prevent false positives)
-#define FIRE_COL_MIN 0
-#define FIRE_COL_MAX 3
+#define FIRE_COL_MIN 13
+#define FIRE_COL_MAX 15
+
+// Buzzer parameters for fire alert
+#define BUZZER_ON_TIME 3000   // 3 second buzz
+#define BUZZER_OFF_TIME 500   // 0.5 second silence
 
 int main(void) {
     // Disable watchdog
@@ -54,19 +61,40 @@ int main(void) {
     
     // Initialize stepper motor
     setup_pins();
+
     
     // Start with counter-clockwise direction (default)
     set_stepper_direction(false);
 
     // Initialize servo
     servo_init();
+
+    // Make sure the servo is at 0 degrees
+    set_servo_degree(0);
+    
+    // Initialize ultrasonic sensor
+    ultrasonic_init();
+    
+    // Initialize buzzer
+    buzzer_init();
+
+    // Initialize LCD
+    lcd_init();
+    // hide the cursor
+    lcd_writecommand(0x0c);
     
     // Main variables
-    uint16_t current_step = 0;
+    int16_t current_step = 0;
     bool scanning_forward = false;  // Start counter-clockwise
     bool fire_detected = false;
     
     serial_println("Starting fire detection patrol with scanning motion...");
+
+    // Print the initial message
+    lcd_moveto(0, 0);
+    // clear the screen
+    lcd_writecommand(0x01);
+    lcd_stringout("Detection On");
     
     // Main loop
     while (1) {
@@ -112,21 +140,35 @@ int main(void) {
                             max_row_pos, max_col_pos);
                     serial_println(buffer);
 
+                    lcd_writecommand(0x01);
+                    lcd_moveto(0, 0);
+                    lcd_stringout("Detection On");
+                    lcd_moveto(1, 0);
+                    lcd_stringout("Step:");
+                    char lcd_buffer[10];
+                    lcd_stringout(itoa(current_step, lcd_buffer, 10));
+                    lcd_stringout(" / ");
+                    lcd_stringout(itoa(SCAN_RANGE_STEPS, lcd_buffer, 10));
+
                     // If max temp is greater than threshold set the btm stepper to move towards
                     if (max_temp > FIRE_THRESHOLD) {
                         // Move the stepper left or right so that the col pos is about 0-3
                         if (max_col_pos < FIRE_COL_MIN) {
-
-                            move_bottom_stepper_once();
-                            serial_println("Moving left to point at fire");
-
-                        } else if (max_col_pos > FIRE_COL_MAX) {
-                            // Set direction to right
-                            set_stepper_direction(true);
-                            move_bottom_stepper_once();
-                            serial_println("Moving right to point at fire");
+                            // we always want it to move counter clockwise
+                            // first check if the current direction is counter clockwise
+                            if (!scanning_forward) { // If the stepper is moving counter clockwise meaning the device is moving clockwise
+                                // if it is ignore and keep moving
+                                serial_println("No need to change direction, keep moving");
+                            } else {
+                                // if it is, move right
+                                // Change direction to right
+                                scanning_forward = false;
+                                set_stepper_direction(scanning_forward);
+                                serial_println("Changing direction to right");
+                            }
                         }
                     }
+
 
                     // Check if fire detected (temp > threshold and in target columns)
                     if (max_temp > FIRE_THRESHOLD && 
@@ -142,12 +184,20 @@ int main(void) {
                     }
                 } else {
                     serial_println("Error reading thermal data");
+                    // lcd_moveto(0, 0);
+                    // // clear the screen
+                    // lcd_writecommand(0x01);
+                    // lcd_stringout("Error reading thermal data");
                 }
             }
         }
         
         // Fire alert mode - motor stopped, monitoring continues
         serial_println("Motor stopped - FIRE ALERT MODE");
+        lcd_moveto(0, 0);
+        // clear the screen
+        lcd_writecommand(0x01);
+        lcd_stringout("Motor stopped - FIRE ALERT MODE");
         
         // Keep monitoring in alert mode if fire is detected
         while (fire_detected) {
@@ -162,17 +212,56 @@ int main(void) {
                         int_part, frac_part, max_row_pos, max_col_pos);
                 serial_println(buffer);
 
-                // print out the whole arrat of temp values in a matrix form
-                // use the print_center_matrix function to print the array
+                // clear the screen
+                lcd_writecommand(0x01);
+                lcd_moveto(0, 0);
+                lcd_stringout("Temp: ");
+                // Correct conversion for int_part
+                char int_part_str[8];  // Enough space for int part
+                itoa(int_part, int_part_str, 10);  // base 10
+                lcd_stringout(int_part_str);
+
+                // Print "."
+                lcd_stringout(".");
+
+                // Correct conversion for frac_part
+                char frac_part_str[4];  // Up to two digits and null terminator
+                if (frac_part < 10) {
+                    // Leading zero for single-digit fraction
+                    lcd_stringout("0");
+                }
+                itoa(frac_part, frac_part_str, 10);
+                lcd_stringout(frac_part_str);
+
+                // Then "°C"
+                lcd_stringout(" C");
+
                 print_center_matrix();
 
+                // Measure distance with ultrasonic sensor
+                float distance = measure_distance();
+                
+                // Display distance
+                char dist_buffer[32];
+                dtostrf(distance, 6, 2, dist_buffer);
+                serial_print("Distance to fire: ");
+                serial_print(dist_buffer);
+                serial_println(" cm");
+
+                // Move to second line
+                lcd_moveto(1, 0);
+                lcd_stringout("Dist:");
+                lcd_stringout(dist_buffer);
+                lcd_stringout(" cm");
+                
+                // Play the warning sound
+                buzzer_warning();
 
                 // Set servo to 0 and 105 degrees
                 set_servo_degree(0);
                 _delay_ms(1000);
                 set_servo_degree(105);
                 _delay_ms(1000);
-
             }
 
             // Check if fire is detected
@@ -182,6 +271,10 @@ int main(void) {
             } else {
                 fire_detected = false;
                 serial_println("Fire alert mode ended");
+                lcd_moveto(0, 0);
+                // clear the screen
+                lcd_writecommand(0x01);
+                lcd_stringout("Fire alert mode ended");
             }
             
             // Update at 1Hz in alert mode
