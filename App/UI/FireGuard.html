@@ -290,6 +290,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            cursor: pointer;
         }
         
         .action-button.primary {
@@ -358,13 +359,55 @@
         body.extinguished .extinguishing-content {
             display: none;
         }
+        
+        /* Temperature Matrix visualization */
+        .temp-matrix-container {
+            margin-top: 16px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .temp-matrix {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 1px;
+            background-color: #2c2c2e;
+            padding: 2px;
+            border-radius: 8px;
+        }
+        
+        .temp-cell {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+        
+        /* Connection Status */
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background-color: rgba(28, 28, 30, 0.8);
+        }
+        
+        .connection-status.connected {
+            color: #30d158;
+        }
+        
+        .connection-status.disconnected {
+            color: #ff375f;
+        }
     </style>
 </head>
 <body class="no-alert">
     <div class="container">
         <!-- iOS 18 Status Bar -->
         <div class="status-bar">
-            <div class="time">11:42</div>
+            <div class="time" id="current-time">11:42</div>
             <div class="status-icons">
                 <div class="signal-icon">
                     <div class="signal-bar"></div>
@@ -380,6 +423,9 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Connection Status Indicator -->
+        <div class="connection-status disconnected" id="connection-status">Disconnected</div>
         
         <!-- Header -->
         <header>
@@ -402,25 +448,21 @@
                         <div class="status-label">System Status</div>
                         <div class="status-value">
                             <div class="status-indicator indicator-active"></div>
-                            Active
+                            <span id="system-status">Active</span>
                         </div>
                     </div>
                     <div class="status-row">
-                        <div class="status-label">Water Tank</div>
-                        <div class="status-value">98% Full</div>
-                    </div>
-                    <div class="status-row">
-                        <div class="status-label">Projectile Supply</div>
-                        <div class="status-value">10 Units</div>
+                        <div class="status-label">Last Temperature</div>
+                        <div class="status-value" id="last-temperature">--</div>
                     </div>
                     <div class="status-row">
                         <div class="status-label">Last Check</div>
-                        <div class="status-value">Today, 10:30 AM</div>
+                        <div class="status-value" id="last-check">--</div>
                     </div>
                 </div>
                 
                 <div class="action-buttons">
-                    <div class="action-button">
+                    <div class="action-button" id="test-button">
                         <div class="button-icon">⚙️</div>
                         <div class="button-text">Run Test</div>
                     </div>
@@ -440,77 +482,37 @@
                 </div>
                 
                 <div class="camera-section active">
-                    <img src="assets/images/kitchen_fire.jpg" alt="Fire detection" class="camera-feed">
+                    <div id="temp-visualization" class="camera-feed">
+                        <!-- Temperature matrix will be displayed here -->
+                        <div class="temp-matrix-container">
+                            <div class="temp-matrix" id="temp-matrix"></div>
+                        </div>
+                    </div>
                     <div class="camera-overlay">
                         <div class="live-indicator"></div>
                         <div class="status-label">LIVE</div>
                     </div>
-                    <div class="camera-location">Kitchen Area</div>
+                    <div class="camera-location" id="fire-location">Unknown Location</div>
                 </div>
                 
                 <div class="status-card">
                     <div class="status-row">
                         <div class="status-label">Detection Time</div>
-                        <div class="status-value">11:42 AM</div>
+                        <div class="status-value" id="detection-time">--</div>
                     </div>
                     <div class="status-row">
-                        <div class="status-label">Response Status</div>
-                        <div class="status-value">
-                            <div class="status-indicator indicator-warning"></div>
-                            Preparing
-                        </div>
+                        <div class="status-label">Max Temperature</div>
+                        <div class="status-value" id="max-temperature">--</div>
                     </div>
-                    <!-- <div class="status-row">
-                        <div class="status-label">Selected Method</div>
-                        <div class="status-value">Water System</div>
-                    </div> -->
+                    <div class="status-row">
+                        <div class="status-label">Distance to Fire</div>
+                        <div class="status-value" id="fire-distance">--</div>
+                    </div>
                 </div>
                 
                 <div class="action-buttons">
-                    <div class="action-button primary">
+                    <div class="action-button primary" id="emergency-button">
                         <div class="button-text">Emergency Override</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Extinguishing State -->
-            <div class="extinguishing-content">
-                <div class="alert-status" style="margin-bottom: -16px;">
-                    <div class="alert-icon" style="background-color: rgba(255, 159, 10, 0.3);">💧</div>
-                    <div class="alert-title" style="color: #ff9f0a;">Extinguishing Fire</div>
-                    <div class="alert-description">System is actively suppressing the detected fire.</div>
-                </div>
-                
-                <div class="camera-section active">
-                    <img src="assets/images/kitchen_fire.jpg" alt="Fire suppression" class="camera-feed">
-                    <div class="camera-overlay">
-                        <div class="live-indicator"></div>
-                        <div class="status-label">LIVE</div>
-                    </div>
-                    <div class="camera-location">Kitchen Area</div>
-                </div>
-                
-                <div class="status-card">
-                    <div class="status-row">
-                        <div class="status-label">Operation Status</div>
-                        <div class="status-value">
-                            <div class="status-indicator indicator-warning"></div>
-                            In Progress
-                        </div>
-                    </div>
-                    <div class="status-row">
-                        <div class="status-label">Method</div>
-                        <div class="status-value">Water System Active</div>
-                    </div>
-                    <div class="status-row">
-                        <div class="status-label">Estimated Time</div>
-                        <div class="status-value">10 seconds remaining</div>
-                    </div>
-                </div>
-                
-                <div class="action-buttons">
-                    <div class="action-button primary">
-                        <div class="button-text">Stop Operation</div>
                     </div>
                 </div>
             </div>
@@ -524,12 +526,14 @@
                 </div>
                 
                 <div class="camera-section active">
-                    <img src="assets/images/kitchen_fire.jpg" alt="Extinguished fire" class="camera-feed">
+                    <div id="temp-visualization-extinguished" class="camera-feed">
+                        <!-- Temperature matrix will be displayed here -->
+                    </div>
                     <div class="camera-overlay">
                         <div class="live-indicator"></div>
                         <div class="status-label">LIVE</div>
                     </div>
-                    <div class="camera-location">Kitchen Area</div>
+                    <div class="camera-location" id="fire-location-extinguished">Unknown Location</div>
                 </div>
                 
                 <div class="status-card">
@@ -541,24 +545,20 @@
                         </div>
                     </div>
                     <div class="status-row">
-                        <div class="status-label">Method Used</div>
-                        <div class="status-value">Water System</div>
+                        <div class="status-label">Max Temperature</div>
+                        <div class="status-value" id="max-temperature-extinguished">--</div>
                     </div>
                     <div class="status-row">
                         <div class="status-label">Response Time</div>
-                        <div class="status-value">3.2 seconds</div>
-                    </div>
-                    <div class="status-row">
-                        <div class="status-label">Water Used</div>
-                        <div class="status-value">0.5 liters</div>
+                        <div class="status-value" id="response-time">3.2 seconds</div>
                     </div>
                 </div>
                 
                 <div class="action-buttons">
-                    <div class="action-button">
+                    <div class="action-button" id="view-report-button">
                         <div class="button-text">View Report</div>
                     </div>
-                    <div class="action-button primary">
+                    <div class="action-button primary" id="reset-button">
                         <div class="button-text">Reset System</div>
                     </div>
                 </div>
@@ -582,30 +582,163 @@
         </div>
     </div>
 
-    <!-- For demo purposes - allows switching between states -->
     <script>
-        // Demo script to toggle between states
-        document.addEventListener('DOMContentLoaded', function() {
-            // To see different states, change this class on the body element:
-            // "no-alert" - Normal monitoring mode
-            // "fire-alert" - Fire detected
-            // "extinguishing" - System is working to extinguish fire
-            // "extinguished" - Fire has been successfully extinguished
+        // API base URL with correct port
+        const API_BASE_URL = 'http://localhost:3000';
+        
+        // Update time in status bar
+        function updateTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('current-time').textContent = `${hours}:${minutes}`;
+        }
+        
+        // Update time initially and every minute
+        updateTime();
+        setInterval(updateTime, 60000);
+        
+        // Function to render temperature matrix
+        function renderTemperatureMatrix(matrix, containerId) {
+            const container = document.getElementById(containerId || 'temp-matrix');
+            if (!container) return;
             
-            // For demonstration, we'll set it to "fire-alert" - change this to see different states
-            document.body.className = "fire-alert";
+            // Clear existing content
+            container.innerHTML = '';
             
-            // Demo cycling through states (uncomment to enable)
-            /*
-            let states = ["no-alert", "fire-alert", "extinguishing", "extinguished"];
-            let currentState = 0;
+            // Check if we have matrix data
+            if (!matrix || !matrix.length) return;
             
-            document.body.addEventListener('click', function() {
-                currentState = (currentState + 1) % states.length;
-                document.body.className = states[currentState];
-            });
-            */
+            // Set grid columns based on matrix width
+            const cols = matrix[0].length;
+            container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            
+            // Find min and max temperatures for color scaling
+            let minTemp = 100, maxTemp = 0;
+            for (const row of matrix) {
+                for (const cell of row) {
+                    if (cell === null) continue;
+                    minTemp = Math.min(minTemp, cell);
+                    maxTemp = Math.max(maxTemp, cell);
+                }
+            }
+            
+            // Create cells for each temperature value
+            for (const row of matrix) {
+                for (const cell of row) {
+                    const cellElem = document.createElement('div');
+                    cellElem.className = 'temp-cell';
+                    
+                    if (cell === null) {
+                        // No data for this cell
+                        cellElem.style.backgroundColor = '#444';
+                    } else {
+                        // Calculate color based on temperature (blue to red gradient)
+                        const normalizedTemp = (cell - minTemp) / (maxTemp - minTemp);
+                        const hue = (1 - normalizedTemp) * 240; // 240 is blue, 0 is red
+                        cellElem.style.backgroundColor = `hsl(${hue}, 100%, 50%)`;
+                    }
+                    
+                    container.appendChild(cellElem);
+                }
+            }
+        }
+        
+        // Function to fetch status from server
+        async function fetchStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/status`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const data = await response.json();
+                updateUI(data);
+                
+                // Update connection status
+                document.getElementById('connection-status').textContent = data.connection_status === 'connected' ? 'Connected' : 'Disconnected';
+                document.getElementById('connection-status').className = `connection-status ${data.connection_status}`;
+                
+                // Schedule next update
+                setTimeout(fetchStatus, 1000);
+            } catch (error) {
+                console.error('Error fetching status:', error);
+                document.getElementById('connection-status').textContent = 'Server Error';
+                document.getElementById('connection-status').className = 'connection-status disconnected';
+                
+                // Retry after a delay
+                setTimeout(fetchStatus, 5000);
+            }
+        }
+        
+        // Update UI based on fire data
+        function updateUI(data) {
+            // Update body class to show appropriate content
+            document.body.className = data.state;
+            
+            // Update last check time
+            const lastCheckDate = new Date(data.last_update * 1000);
+            const hours = lastCheckDate.getHours().toString().padStart(2, '0');
+            const minutes = lastCheckDate.getMinutes().toString().padStart(2, '0');
+            document.getElementById('last-check').textContent = `Today, ${hours}:${minutes}`;
+            
+            // Update temperature info
+            if (data.max_temp > 0) {
+                document.getElementById('last-temperature').textContent = `${data.max_temp.toFixed(2)}°C`;
+                document.getElementById('max-temperature').textContent = `${data.max_temp.toFixed(2)}°C`;
+                document.getElementById('max-temperature-extinguished').textContent = `${data.max_temp.toFixed(2)}°C`;
+            }
+            
+            // Update fire location
+            if (data.max_temp_position && data.max_temp_position.length === 2) {
+                const locationText = `Position: [${data.max_temp_position[0]}][${data.max_temp_position[1]}]`;
+                document.getElementById('fire-location').textContent = locationText;
+                document.getElementById('fire-location-extinguished').textContent = locationText;
+            }
+            
+            // Update detection time
+            if (data.detection_time) {
+                document.getElementById('detection-time').textContent = data.detection_time;
+            }
+            
+            // Update distance
+            if (data.distance > 0) {
+                document.getElementById('fire-distance').textContent = `${data.distance.toFixed(2)} cm`;
+            }
+            
+            // Render temperature matrix if available
+            if (data.temperature_matrix && data.temperature_matrix.length > 0) {
+                renderTemperatureMatrix(data.temperature_matrix);
+            }
+        }
+        
+        // Add event listeners to buttons
+        document.getElementById('test-button').addEventListener('click', async () => {
+            try {
+                await fetch(`${API_BASE_URL}/api/test`, { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+            } catch (error) {
+                console.error('Error triggering test:', error);
+            }
         });
+        
+        document.getElementById('reset-button').addEventListener('click', async () => {
+            try {
+                await fetch(`${API_BASE_URL}/api/reset`, { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+            } catch (error) {
+                console.error('Error resetting system:', error);
+            }
+        });
+        
+        // Start polling for status updates
+        fetchStatus();
     </script>
 </body>
 </html>

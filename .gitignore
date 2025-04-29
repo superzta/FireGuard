@@ -5,3 +5,9 @@
 *.s
 *.d
 *.dep
+
+# venv folder
+App/venv/
+
+# __pycache__ folder
+App/__pycache__/
