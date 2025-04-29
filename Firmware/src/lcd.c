@@ -1,6 +1,5 @@
 /*
   lcd.c - Routines for sending data and commands to the LCD shield
-  Modified for serial communication using a single data pin
 */
 
 #include <avr/io.h>
@@ -10,50 +9,41 @@
 
 /* This function not declared in lcd.h since
    should only be used by the routines in this file. */
-void lcd_writebit(unsigned char);
+void lcd_writenibble(unsigned char);
 
-/* Define masks for the bits in Port D */
-#define DATA_PIN (1 << PD2)    // Single data pin on PD2
-#define ENABLE_PIN (1 << PD4)  // Enable pin on PD4
-#define RS_PIN (1 << PB0)      // Register select pin remains on PB0
+/* Define a couple of masks for the bits in Port B and Port D */
+#define DATA_BITS ((1 << PD2)|(1 << PB7)|(1 << PB2)|(1 << PB1))
+
+// PD4 is Enable, PB0 is RS
+#define CTRL_BITS ((1 << PB0))
+#define ENABLE_BIT (1 << PD4)
 
 /*
-  lcd_init - Initialize the LCD display for serial communication
+  lcd_init - Do various things to initialize the LCD display
 */
 void lcd_init(void)
 {
-    // Set the DDR register bits for the pins we're using
-    DDRB |= RS_PIN;           // RS pin as output
-    DDRD |= DATA_PIN | ENABLE_PIN;  // Data and Enable pins as outputs
+  
+    DDRB |= (CTRL_BITS | (1 << PB7) | (1 << PB1) | (1 << PB2)); // Set the DDR register bits for port B      
+    DDRD |= ((1 << PD2) | ENABLE_BIT);                          // Set the DDR register bits for port D
+         // Take care not to affect any unnecessary bits
 
-    _delay_ms(15);            // Delay at least 15ms after power on
+    _delay_ms(15);              // Delay at least 15ms
+
+    lcd_writenibble(0x30);      // Use lcd_writenibble to send 0b0011
+    _delay_ms(5);               // Delay at least 4msec
+
+    lcd_writenibble(0x30);      // Use lcd_writenibble to send 0b0011
+    _delay_us(120);             // Delay at least 100usec
+
+    lcd_writenibble(0x30);      // Use lcd_writenibble to send 0b0011, no delay needed
+
+    lcd_writenibble(0x20);      // Use lcd_writenibble to send 0b0010
+    _delay_ms(2);               // Delay at least 2ms
     
-    // Initialize in 8-bit mode first
-    // Send 0x30 three times
-    for (int i = 0; i < 3; i++) {
-        // Send each bit of 0x30 (0b00110000)
-        for (int bit = 7; bit >= 0; bit--) {
-            lcd_writebit((0x30 >> bit) & 0x01);
-        }
-        
-        if (i == 0) _delay_ms(5);      // First time: wait > 4.1ms
-        else if (i == 1) _delay_us(120); // Second time: wait > 100us
-        // Third time: no delay needed
-    }
-    
-    // Switch to 8-bit mode with 1-line display
-    // Send 0x20 (0b00100000)
-    for (int bit = 7; bit >= 0; bit--) {
-        lcd_writebit((0x20 >> bit) & 0x01);
-    }
-    _delay_ms(2);
-    
-    // Configure the display
-    lcd_writecommand(0x20);    // Function set: 8-bit interface, 1 line
-    lcd_writecommand(0x0C);    // Display on, cursor off, blink off
-    lcd_writecommand(0x01);    // Clear display
-    _delay_ms(2);              // Clear display command needs > 1.5ms
-    lcd_writecommand(0x06);    // Entry mode: increment cursor, no shift
+    lcd_writecommand(0x28);     // Function Set: 4-bit interface, 2 lines
+
+    lcd_writecommand(0x0f);     // Display and cursor on
 }
 
 /*
@@ -79,61 +69,91 @@ void lcd_moveto(unsigned char row, unsigned char col)
 void lcd_stringout(char *str)
 {
     int i = 0;
-    while (str[i] != '\0') {    // Loop until next character is NULL byte
+    while (str[i] != '\0') {    // Loop until next charater is NULL byte
         lcd_writedata(str[i]);  // Send the character
         i++;
     }
 }
 
 /*
-  lcd_writecommand - Output a byte to the LCD command register using serial communication
+  lcd_writecommand - Output a byte to the LCD command register.
 */
 void lcd_writecommand(unsigned char cmd)
 {
-    /* Clear RS pin (PB0) to 0 for a command transfer */
-    PORTB &= ~RS_PIN;
-    
-    /* Send each bit of the command byte serially */
-    for (int bit = 7; bit >= 0; bit--) {
-        lcd_writebit((cmd >> bit) & 0x01);
-    }
-    
+    /* Clear PB0 to 0 for a command transfer */
+  PORTB &= ~(1 << PB0);
+    /* Call lcd_writenibble to send UPPER four bits of "cmd" argument */
+  lcd_writenibble(cmd);
+    /* Call lcd_writenibble to send LOWER four bits of "cmd" argument */
+  lcd_writenibble(cmd << 4);
     /* Delay 2ms */
-    _delay_ms(2);
+  _delay_ms(2);
 }
 
 /*
-  lcd_writedata - Output a byte to the LCD data register using serial communication
+  lcd_writedata - Output a byte to the LCD data register
 */
 void lcd_writedata(unsigned char dat)
 {
-    /* Set RS pin (PB0) to 1 for a data transfer */
-    PORTB |= RS_PIN;
-    
-    /* Send each bit of the data byte serially */
-    for (int bit = 7; bit >= 0; bit--) {
-        lcd_writebit((dat >> bit) & 0x01);
-    }
-    
+    /* Set PB0 to 1 for a data transfer */
+  PORTB |= (1 << PB0);
+    /* Call lcd_writenibble to send UPPER four bits of "dat" argument */
+  lcd_writenibble(dat);
+    /* Call lcd_writenibble to send LOWER four bits of "dat" argument */
+  lcd_writenibble(dat << 4);
     /* Delay 2ms */
-    _delay_ms(2);
+  _delay_ms(2);
+
 }
 
 /*
-  lcd_writebit - Output a single bit to the LCD
+  lcd_writenibble - Output the UPPER four bits of "lcdbits" to the LCD
 */
-void lcd_writebit(unsigned char bit)
+void lcd_writenibble(unsigned char lcdbits)
 {
-    /* Set or clear the data pin based on the bit value */
-    if (bit) {
-        PORTD |= DATA_PIN;    // Set data pin high
-    } else {
-        PORTD &= ~DATA_PIN;   // Set data pin low
-    }
+    /* Load data bits with the appropriate bits from lcdbits */
+    // Clear all data pins first
+    PORTD &= ~(1 << PD2);
+    PORTB &= ~((1 << PB7) | (1 << PB1) | (1 << PB2));
     
-    /* Toggle the enable pin to clock in the bit */
-    PORTD |= ENABLE_PIN;       // Set enable pin high
-    _delay_us(1);              // Small delay
-    PORTD &= ~ENABLE_PIN;      // Set enable pin low
-    _delay_us(1);              // Small delay between bits
+    // // Set the data pins based on the upper 4 bits of lcdbits
+    if (lcdbits & 0x10) PORTD |= (1 << PD2);
+    if (lcdbits & 0x20) PORTB |= (1 << PB7);
+    if (lcdbits & 0x40) PORTB |= (1 << PB2);
+    if (lcdbits & 0x80) PORTB |= (1 << PB1);
+
+    // if (lcdbits & 0x10) PORTD |= (1 << PB1);
+    // if (lcdbits & 0x20) PORTB |= (1 << PB2);
+    // if (lcdbits & 0x40) PORTB |= (1 << PB7);
+    // if (lcdbits & 0x80) PORTB |= (1 << PD2);
+
+    /* Make E signal (PD4) go to 1 and back to 0 */
+    PORTD |= ENABLE_BIT;        // Set E to 1
+    PORTD |= ENABLE_BIT;        // Make E longer
+    PORTD &= ~ENABLE_BIT;       // Set E to 0
 }
+
+
+// Exclude main for
+
+// #ifndef EXCLUDE_MAIN
+// int main(void)
+// {
+//     lcd_init();
+//     lcd_moveto(0, 0);
+//     lcd_stringout("Hello, World!");
+//     // hide cursor
+//     lcd_writecommand(0x0c);
+
+//     while (1) {
+//         lcd_moveto(0, 0);
+//         lcd_stringout("Hello, World!");
+//         _delay_ms(1000);
+//         // clear the screen
+//         lcd_writecommand(0x01);
+//         _delay_ms(1);
+        
+//     }
+//     return 0;
+// }
+// #endif

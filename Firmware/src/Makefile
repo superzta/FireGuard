@@ -1,7 +1,7 @@
 DEVICE     = atmega328p
 CLOCK      = 7372800
 PROGRAMMER = -c usbtiny -P usb
-OBJECTS    = test_lcd.o lcd.o
+OBJECTS    = FireGuard.o I2C_lib.o stepper_lib.o servo_lib.o ultrasonic_lib.o buzzer_lib.o lcd_lib.o
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0xe0:m
 
 # Fuse Low Byte = 0xe0   Fuse High Byte = 0xd9   Fuse Extended Byte = 0xff
@@ -40,6 +40,25 @@ all:	main.hex
 
 .c.s:
 	$(COMPILE) -S $< -o $@
+
+# Convert I2C.c and stepper.c to library versions without main function
+I2C_lib.o: I2C.c I2C.h
+	$(COMPILE) -c I2C.c -o I2C_lib.o -D EXCLUDE_MAIN
+
+stepper_lib.o: stepper.c stepper.h
+	$(COMPILE) -c stepper.c -o stepper_lib.o -D EXCLUDE_MAIN
+
+servo_lib.o: servo.c servo.h
+	$(COMPILE) -c servo.c -o servo_lib.o -D EXCLUDE_MAIN
+
+ultrasonic_lib.o: ultrasonic.c ultrasonic.h
+	$(COMPILE) -c ultrasonic.c -o ultrasonic_lib.o -D EXCLUDE_MAIN
+
+buzzer_lib.o: buzzer.c buzzer.h
+	$(COMPILE) -c buzzer.c -o buzzer_lib.o -D EXCLUDE_MAIN
+
+lcd_lib.o: lcd.c lcd.h
+	$(COMPILE) -c lcd.c -o lcd_lib.o -D EXCLUDE_MAIN
 
 flash:	all
 	$(AVRDUDE) -U flash:w:main.hex:i
