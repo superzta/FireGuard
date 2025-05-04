@@ -290,3 +290,195 @@ Team Members:
 - Robert Zhang
 
 **Image instruction**: Create a clean, professional closing slide with the FireGuard logo (a shield with flame icon in modern, minimalist style) and space for team photos. Use a dark background with accent colors that match the FireGuard interface theme.
+
+# Slides
+
+```
+FireGuard 2.0
+FireGuard 2.0
+ML
+FireGuard 2.0
+Smart Fire Extinguishing System
+Protecting Homes & Gardens from Fire with a next-generation autonomous solution.
+
+Owen Zeng, Leikhang Xiong, Robert Zhang
+FireGuard 2.0
+1
+Detect Heat
+2
+Measure Distance
+3
+Calculate Angle
+4
+Activate Suppression
+5
+Send App Notification to User
+
+
+Project Decomposition
+Thermal Camera (MLX90640)
+Detects heat directly and trigger alert based on certain temp threshold 
+Resolution: 32 × 24 pixels (768) 
+Temp range: -40°C to +300°C (±1°C)
+I²C Communication Protocal
+Threshold: 30 (Uncalibrated) Normal reading is -10 (Room temp) 
+Ultrasonic Range Finder (HC-SR04 ) 
+Estimate distance from the heat source and the FireGuard
+Measuring range: 2 cm to 400 cm (±3 mm)
+5V
+Mismeasurements
+Mismeasurement can happen to detect a soldering iron because it's small and curved
+
+12V Bipolar Stepper Motor (ROB-09238)
+Ensures accurate rotation of our fire extinguisher(Nerf Gun)
+Pro: Strong holding torque even when stopped (great for holding a position).
+Precise Position Control good for Known repeatable movements
+12V DC
+Stepper drivers
+
+Easy Driver
+1.Simplifies wiring and usage 
+2. 1/8 microstepping
+3.Allows smoother rotation
+4.Two signals: STEP and DIR
+
+
+LCD Display (CDM 16216B)
+Provides suppression mode, targeting temperature, and distance
+Display format: 16 characters x 2 lines
+5V and Parallel Interface 
+Why Parallel?
+Simple wiring — Directly wiring the pins — no need for SPI modules or extra circuitry
+But it use more pins than SPI-based one ( 4 or 8 data pins)
+Select the 4 bit mode to save pins  
+
+Buzzer
+Fire alarm and Alert mechanism for our FireGuard System 
+Fast, loud, simple, and reliable
+Why not LED or Vibration motor? 
+Doesn’t require visual attention — people can hear it even if they’re not looking at the device
+Effective for alerting people across a room
+
+Servo Motor 
+Part of the triggering mechanism of the Nerf Gun (Launch fire supression )
+Why servo? 
+Compact — easy to mount to the Nerf gun body
+Fast response and accurate angle control
+Easy to implement — A simple PWM signal
+Problem:
+It requires a precise manual calibration
+A slight mispositioning can cause a problem of shotting improperly
+Detect Properly but not able to launch fire suppression
+Triggering Machism
+3D Printed Components
+
+
+FireGuard Prototype Design
+General requirements for prototype
+Hold:
+Camera
+Thermal sensor
+Ultrasonic sensor
+Launcher (Nerf blaster)
+stepper motors
+elevation
+rotation
+Ensure stability
+Prusa MK4 - PLA Black
+Standard/Prototyping 3D printer
+validation of concept
+FireGuard Iterated Design
+Key modifications
+Circuit board mount
+Angles of elevation/depression limit
+Tighter tolerances for stepper motors
+General material reduction (cost and weight savings)
+Stratasys F370 - ABS M30
+Reinforced 3D printer, higher quality filament, better precision
+Parts
+Thermal Camera 
+(MLX90640, I2C)
+$74.95
+Ultrasonic Sensor
+(HC-SR04, digital)
+$3.95
+Stepper Motors 
+(12V bipolar, 1.8° step, driven by A4988/DRV8825, digital pulse control)
+$17
+Launcher Nerf Blaster
+(Nerf Modulus Stryfe Motorized Blaster)
+$33.99
+LCD 
+(CDM162116B, 16x2, Parallel)
+$87.56
+Wi-Fi Module 
+(ESP8266, UART)
+$7.5
+Camera Module 
+(OV2640, SPI interface)
+$9
+3D-Printed Mounts/Enclosure Prototype (Standard Printer)
+Custom-built
+$20
+3D-Printed Mounts/Enclosure Iteration (Reinforced Printer)
+Custom-built
+$100 
+3D-Printed Fire Suppressant Projectiles
+Custom-built
+$5
+Total (Reinforced + Standard or Standard)
+
+$358.95 or $258.95
+Software
+System Initialization: Set up UART, LCD, stepper motors, thermal sensor, servo, ultrasonic range finder, and buzzer.
+Patrol and Thermal Scanning: Move the stepper motor to scan over 120°, periodically read thermal data, and adjust motor direction based on fire location.
+Fire Detection and Alerting: Detect fire based on temperature and position, trigger LCD/UART alerts, activate buzzer and servo movements.
+Monitoring and Recovery: Monitor fire status; if cleared, resume patrol and scanning automatically.
+Memory Challenges
+ATmega328P Limitations:
+2KB SRAM (Data Memory)
+32KB Flash (Program Storage)
+The Memory Challenge:
+Thermal camera produces 768 temperature points (32×24 resolution)
+Standard floating-point storage would require ~3KB
+Additional memory needed for processing and functions total of 14KB 700%
+
+
+Memory Optimization
+float (4 Bytes) → int16_t (2 Bytes)
+Store temperatures as fixed-point integers (centidegrees)
+Example: 32.5°C → 3250
+Thermal Camera Full Resolution Optimization
+Focus on center 16×16 region (256 points) out of 32×24 pixel thermal image (768 points)
+700% → 70%  in data memory usage 
+Flask Server Architecture
+Two-thread Architecture: Main thread (Flask) serves requests while background thread handles serial I/O
+Parser System: parse_temperature_matrix() converts raw serial data to temperature arrays
+Automatic Recovery: Handles serial disconnects with auto-reconnect logic
+High-Speed UART: 230400 Baud rate with efficient buffering for thermal data
+App Design
+UI Components:
+Status Dashboard: Overall system state
+Temperature Matrix Visualization: Heat map display
+Alert Panel: Fire detection notifications
+Control Interface: System testing and reset
+Technical Implementation:
+Responsive design for mobile and desktop
+Dynamic temperature visualization using CSS grid
+AJAX polling for real-time updates
+Color mapping algorithm for intuitive temperature display
+UI/UX
+
+Future Improvement
+Machine Learning Integration: Pattern recognition for improved detection
+Wireless Connectivity: Remote monitoring and notifications
+System Integration: Building management and smart home APIs
+
+
+We just want FireGuard to keep your home—and everyone in it—safe.
+
+
+
+
+Gamma
+```
